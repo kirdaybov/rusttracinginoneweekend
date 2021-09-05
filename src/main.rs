@@ -2,6 +2,8 @@ use std::fs::File;
 use std::io::Write;
 use std::path::Path;
 use std::ops::{Index, IndexMut, Add, AddAssign, Sub, SubAssign, Mul, MulAssign, Div, DivAssign};
+use std::fmt;
+use std::fmt::Display;
 
 fn printToFile(file: &mut File, string: &str)
 {
@@ -11,6 +13,7 @@ fn printToFile(file: &mut File, string: &str)
     }
 }
 
+#[derive(Clone, Copy)]
 struct Vec3 {
     e: [f64; 3]
 }
@@ -25,9 +28,47 @@ impl Vec3 {
         }
     }
 
-    //fn length(&self) -> f64 {
-    //    (self.e[0].powi(2) + self.e[1].powi(2) + self.e[2].powi(2)).sqrt()
-    //}
+    pub fn x(self) -> f64 {
+        self[0]
+    }
+
+    pub fn y(self) -> f64 {
+        self[1]
+    }
+
+    pub fn z(self) -> f64 {
+        self[2]
+    }
+
+    pub fn dot(self, other : Vec3) -> f64 {
+        self[0]*other[0] + self[1]*other[1] + self[2]*other[2]
+    }
+
+    pub fn cross(self, other : Vec3) -> Vec3 {
+        Vec3 { 
+            e : [
+                self[1]*other[2] - self[2]*other[1],
+                self[2]*other[0] - self[0]*other[2],
+                self[0]*other[1] - self[1]*other[0]
+            ]
+        }
+    }
+
+    pub fn length(self) -> f64 {
+        self.dot(self).sqrt()
+    }
+
+    pub fn normalized(self) -> Vec3 {
+        self / self.length()
+    }
+
+    pub fn format_color(self) -> String {
+        format!("{} {} {}", 
+            (255.99 * self[0]) as u64,
+            (255.99 * self[1]) as u64,
+            (255.99 * self[2]) as u64,
+        )
+    }
 }
 
 impl Index<usize> for Vec3 {
@@ -120,11 +161,17 @@ impl DivAssign<f64> for Vec3 {
     }
 }
 
+impl Display for Vec3 {
+    fn fmt(&self, f : &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "({}, {}, {})", self[0], self[1], self[2])
+    }
+}
+
 fn main() {
     const IMAGE_WIDTH: u64 = 256;
     const IMAGE_HEIGHT: u64 = 256;
 
-    let path = Path::new("D:\\_work\\rust\\rtinoneweekend\\img.ppm");
+    let path = Path::new("c:\\_work\\rusttracing\\img.ppm");
 
     let mut file = match File::create(&path) {
         Err(why) => panic!("Couldn't create {}: {}", path.display(), why),
@@ -139,15 +186,15 @@ fn main() {
     println!("{} {}", IMAGE_WIDTH, IMAGE_HEIGHT);
     println!("255");
 
-    for j in 0..IMAGE_WIDTH {
-        for i in 0..IMAGE_HEIGHT {
-            let r = i as f64 / (IMAGE_HEIGHT - 1) as f64;
-            let g = j as f64 / (IMAGE_WIDTH - 1) as f64;
-            let b = 0.25;
-            let ir = (255.99 * r) as u64;
-            let ig = (255.99 * g) as u64;
-            let ib = (255.99 * b) as u64;
-            printToFile(&mut file, format!("{} {} {}", ir, ig, ib).as_str());
+    for j in 0..IMAGE_HEIGHT {
+        for i in 0..IMAGE_WIDTH {
+            let pixel_color = Color::new(
+                i as f64 / (IMAGE_WIDTH - 1) as f64,
+                j as f64 / (IMAGE_HEIGHT - 1) as f64,
+                0.25
+            );
+            
+            printToFile(&mut file, pixel_color.format_color().as_str());
         }
     }
 }
