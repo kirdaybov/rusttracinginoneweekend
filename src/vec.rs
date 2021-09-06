@@ -49,12 +49,16 @@ impl Vec3 {
         self / self.length()
     }
 
+    pub fn index_int(self, idx : usize) -> u64 {
+        (255.99 * self[idx]) as u64
+    }
+
     pub fn format_color(self) -> String {
         format!(
             "{} {} {}",
-            (255.99 * self[0]) as u64,
-            (255.99 * self[1]) as u64,
-            (255.99 * self[2]) as u64,
+            self.index_int(0),
+            self.index_int(1),
+            self.index_int(2)
         )
     }
 }
@@ -120,6 +124,15 @@ impl Mul<f64> for Vec3 {
     fn mul(self, other: f64) -> Vec3 {
         Vec3 {
             e: [self[0] * other, self[1] * other, self[2] * other],
+        }
+    }
+}
+
+impl Mul<Vec3> for f64 {
+    type Output = Vec3;
+    fn mul(self, other: Vec3) -> Vec3 {
+        Vec3 {
+            e: [self * other[0], self * other[1], self * other[2]],
         }
     }
 }

@@ -1,5 +1,7 @@
+use super::vec::{Vec3, Point3};
+
 pub struct Ray {
-    orig: Vec3,
+    orig: Point3,
     dir: Vec3
 }
 
