@@ -1,19 +1,16 @@
-use std::{fs::File};
-use std::io::Write;
-use std::path::Path;
 mod vec;
 mod ray;
-use ray::Ray;
-use vec::{Vec3, Color, Point3};
+mod hit;
+mod sphere;
+
+use std::path::Path;
+
 use bmp::{Image, Pixel};
 
-fn printToFile(file: &mut File, string: &str)
-{
-    match file.write(format!("{}\n", string).as_bytes()) {
-        Err(why) => panic!("Couldn't write to file: {}", why),
-        Ok(_) => ()
-    }
-}
+use vec::{Vec3, Color, Point3};
+use ray::Ray;
+use hit::{Hit, World};
+use sphere::Sphere;
 
 impl From<Color> for Pixel {
     fn from(pixel: Color) -> Pixel {
@@ -38,12 +35,9 @@ fn hit_sphere(center: Point3, radius: f64, ray: &Ray) -> f64 {
     }
 }
 
-fn ray_color(ray: &Ray) -> Color {
-    let center = Point3::new(0.0, 0.0, -1.0);
-    let t = hit_sphere(center, 0.5, ray);
-    if t > 0.0 {
-        let n = (ray.at(t) - center).normalized();
-        return (n + Color::new(1.0, 1.0, 1.0))/2.0;
+fn ray_color(ray: &Ray, world: &World) -> Color {
+    if let Some(rec) = world.hit(ray, 0.0, f64::INFINITY) {
+        return (rec.normal + Color::new(1.0, 1.0, 1.0))/2.0;
     }
 
     let unit_direction = ray.direction().normalized();
@@ -52,20 +46,25 @@ fn ray_color(ray: &Ray) -> Color {
 }
 
 fn main() {
+    // Image
     const ASPECT_RATIO: f64 = 16.0/9.0;
     const IMAGE_WIDTH: u32 = 256;
     const IMAGE_HEIGHT: u32 = (IMAGE_WIDTH as f64 / ASPECT_RATIO) as u32;
 
+    // Camera
     let viewport_height = 2.0;
     let viewport_width = viewport_height * ASPECT_RATIO;
+    let origin = Vec3::new( 0.0, 0.0, 0.0);
     let left_corner = Point3::new(- viewport_width/2.0, -viewport_height/2.0, -1.0);
 
-    let path = Path::new("c:\\_work\\rusttracing\\img.bmp");
+    // World
+    let mut world = World::new();
+    world.push(Box::new(Sphere::new(Point3::new(0.0, 0.0, -1.0), 0.5)));
+    world.push(Box::new(Sphere::new(Point3::new(0.0, -100.5, -1.0), 100.0)));
 
     let mut img = Image::new(IMAGE_WIDTH, IMAGE_HEIGHT);
 
-    let origin = Vec3::new( 0.0, 0.0, 0.0);
-
+    
     for (x, y) in img.coordinates() {
         let (u, v) = (
             x as f64 / (IMAGE_WIDTH - 1) as f64,
@@ -80,9 +79,10 @@ fn main() {
             )
         );
 
-        img.set_pixel(x, y, Pixel::from(ray_color(&ray)));
+        img.set_pixel(x, y, Pixel::from(ray_color(&ray, &world)));
     }
 
+    let path = Path::new("c:\\_work\\rusttracing\\img.bmp");
     img.save(path);
     println!("Success!");
 }
