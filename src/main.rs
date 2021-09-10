@@ -15,6 +15,10 @@ use ray::Ray;
 use sphere::Sphere;
 use vec::{Color, Point3, Vec3};
 
+use std::sync::{Arc, Mutex};
+use std::thread;
+use std::thread::JoinHandle;
+
 impl From<Color> for Pixel {
     fn from(pixel: Color) -> Pixel {
         Pixel {
@@ -40,12 +44,12 @@ fn hit_sphere(center: Point3, radius: f64, ray: &Ray) -> f64 {
 
 fn ray_color(ray: &Ray, world: &World, depth: u64) -> Color {
     if depth <= 0 {
-        return Color::new(0.0, 0.0, 0.0)
+        return Color::new(0.0, 0.0, 0.0);
     }
     if let Some(rec) = world.hit(ray, 0.001, f64::INFINITY) {
-        let target = rec.p + rec.normal + Vec3::random_in_unit_sphere();
+        let target = rec.p + rec.normal + Vec3::random_in_unit_sphere().normalized();
         let r = Ray::new(rec.p, target - rec.p);
-        return 0.5 * ray_color(&r, world, depth - 1)
+        return 0.5 * ray_color(&r, world, depth - 1);
     }
 
     let unit_direction = ray.direction().normalized();
@@ -56,23 +60,56 @@ fn ray_color(ray: &Ray, world: &World, depth: u64) -> Color {
 fn main() {
     // Image
     const ASPECT_RATIO: f64 = 16.0 / 9.0;
-    const IMAGE_WIDTH: u32 = 256;
+    const IMAGE_WIDTH: u32 = 512;
     const IMAGE_HEIGHT: u32 = (IMAGE_WIDTH as f64 / ASPECT_RATIO) as u32;
     const SAMPLES_PER_PIXEL: u64 = 100;
     const MAX_DEPTH: u64 = 5;
 
-    let camera = Camera::new(ASPECT_RATIO);
+    // Multithreading
+    const NUM_CORES: usize = 16;
+    const WIDTH_PER_CORE: u32 = IMAGE_WIDTH / NUM_CORES as u32;
 
-    // World
-    let mut world = World::new();
-    world.push(Box::new(Sphere::new(Point3::new(0.0, 0.0, -1.0), 0.5)));
-    world.push(Box::new(Sphere::new(Point3::new(0.0, -100.5, -1.0), 100.0)));
+    let img = Arc::new(Mutex::new(Image::new(IMAGE_WIDTH, IMAGE_HEIGHT)));
 
-    let mut img = Image::new(IMAGE_WIDTH, IMAGE_HEIGHT);
+    let mut handles: Vec<JoinHandle<()>> = Vec::new();
 
-    let mut rng = rand::thread_rng();
+    for i in 0..NUM_CORES as u32 {
+        let img = Arc::clone(&img);
+        let handle = thread::spawn(move || {
+            let camera = Camera::new(ASPECT_RATIO);
 
-    for (x, y) in img.coordinates() {
+            // World
+            let mut world = World::new();
+            world.push(Box::new(Sphere::new(Point3::new(0.0, 0.0, -1.0), 0.5)));
+            world.push(Box::new(Sphere::new(Point3::new(0.0, -100.5, -1.0), 100.0)));
+
+            let mut rng = rand::thread_rng();
+            for x in (WIDTH_PER_CORE * i)..(WIDTH_PER_CORE * (i + 1)) {
+                for y in 0..IMAGE_HEIGHT {
+                    let mut pixel_color = Color::new(0.0, 0.0, 0.0);
+                    for _ in 0..SAMPLES_PER_PIXEL {
+                        let random_u: f64 = rng.gen();
+                        let random_v: f64 = rng.gen();
+                        let (u, v) = (
+                            (x as f64 + random_u) / (IMAGE_WIDTH - 1) as f64,
+                            (y as f64 + random_v) / (IMAGE_HEIGHT - 1) as f64,
+                        );
+                        let ray = camera.get_ray(u, 1.0 - v);
+                        pixel_color += ray_color(&ray, &world, MAX_DEPTH);
+                    }
+                    let mut image = img.lock().unwrap();
+                    image.set_pixel(x, y, Pixel::from(pixel_color / SAMPLES_PER_PIXEL as f64));
+                }
+            }
+        });
+        handles.push(handle);
+    }
+
+    for handle in handles {
+        handle.join().unwrap();
+    }
+
+    /*for (x, y) in img.coordinates() {
         let mut pixel_color = Color::new(0.0, 0.0, 0.0);
         for _ in 0..SAMPLES_PER_PIXEL {
             let random_u: f64 = rng.gen();
@@ -86,9 +123,9 @@ fn main() {
         }
 
         img.set_pixel(x, y, Pixel::from(pixel_color / SAMPLES_PER_PIXEL as f64));
-    }
+    }*/
 
     let path = Path::new("c:\\_work\\rusttracing\\img.bmp");
-    img.save(path);
+    img.lock().unwrap().save(path);
     println!("Success!");
 }
