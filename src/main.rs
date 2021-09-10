@@ -13,7 +13,7 @@ use hit::{Hit, World};
 use rand::Rng;
 use ray::Ray;
 use sphere::Sphere;
-use vec::{Color, Point3};
+use vec::{Color, Point3, Vec3};
 
 impl From<Color> for Pixel {
     fn from(pixel: Color) -> Pixel {
@@ -38,9 +38,14 @@ fn hit_sphere(center: Point3, radius: f64, ray: &Ray) -> f64 {
     }
 }
 
-fn ray_color(ray: &Ray, world: &World) -> Color {
-    if let Some(rec) = world.hit(ray, 0.0, f64::INFINITY) {
-        return (rec.normal + Color::new(1.0, 1.0, 1.0)) / 2.0;
+fn ray_color(ray: &Ray, world: &World, depth: u64) -> Color {
+    if depth <= 0 {
+        return Color::new(0.0, 0.0, 0.0)
+    }
+    if let Some(rec) = world.hit(ray, 0.001, f64::INFINITY) {
+        let target = rec.p + rec.normal + Vec3::random_in_unit_sphere();
+        let r = Ray::new(rec.p, target - rec.p);
+        return 0.5 * ray_color(&r, world, depth - 1)
     }
 
     let unit_direction = ray.direction().normalized();
@@ -54,6 +59,7 @@ fn main() {
     const IMAGE_WIDTH: u32 = 256;
     const IMAGE_HEIGHT: u32 = (IMAGE_WIDTH as f64 / ASPECT_RATIO) as u32;
     const SAMPLES_PER_PIXEL: u64 = 100;
+    const MAX_DEPTH: u64 = 5;
 
     let camera = Camera::new(ASPECT_RATIO);
 
@@ -76,7 +82,7 @@ fn main() {
                 (y as f64 + random_v) / (IMAGE_HEIGHT - 1) as f64,
             );
             let ray = camera.get_ray(u, 1.0 - v);
-            pixel_color += ray_color(&ray, &world);
+            pixel_color += ray_color(&ray, &world, MAX_DEPTH);
         }
 
         img.set_pixel(x, y, Pixel::from(pixel_color / SAMPLES_PER_PIXEL as f64));

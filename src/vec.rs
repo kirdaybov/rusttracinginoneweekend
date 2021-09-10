@@ -1,6 +1,8 @@
 use std::fmt;
 use std::fmt::Display;
-use std::ops::{Add, AddAssign, Div, DivAssign, Index, IndexMut, Mul, MulAssign, Sub, SubAssign};
+use std::ops::{Add, AddAssign, Div, DivAssign, Index, IndexMut, Mul, MulAssign, Sub, SubAssign, Range};
+
+use rand::Rng;
 
 #[derive(Clone, Copy)]
 pub struct Vec3 {
@@ -50,7 +52,7 @@ impl Vec3 {
     }
 
     pub fn index_int(self, idx : usize) -> u64 {
-        (255.99 * self[idx]) as u64
+        (256.0 * self[idx].sqrt().clamp(0.0, 0.999)) as u64
     }
 
     pub fn format_color(self) -> String {
@@ -60,6 +62,23 @@ impl Vec3 {
             self.index_int(1),
             self.index_int(2)
         )
+    }
+
+    pub fn random(r: Range<f64>) -> Vec3 {
+        let mut rng = rand::thread_rng();
+
+        Vec3 { 
+            e: [rng.gen_range(r.clone()), rng.gen_range(r.clone()), rng.gen_range(r)]
+        }
+    }
+
+    pub fn random_in_unit_sphere() -> Vec3 {
+        loop {
+            let p = Vec3::random(-1.0..1.0);
+            if p.length() < 1.0 {
+                return p
+            }
+        }
     }
 }
 
