@@ -39,7 +39,7 @@ impl Hit for Sphere {
              }
         }
 
-        let outward_normal = (ray.at(root) - self.center).normalized();
+        let outward_normal = (ray.at(root) - self.center) / self.radius; // divide by radius instead of .normalized() to get an inverted sphere when radius is negative
         let mut rec = HitRecord {
             p: ray.at(root),
             normal: Vec3::new(0.0, 0.0, 0.0),

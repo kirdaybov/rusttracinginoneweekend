@@ -22,6 +22,8 @@ use std::thread;
 use std::thread::JoinHandle;
 use std::rc::Rc;
 
+use crate::material::Dielectric;
+
 impl From<Color> for Pixel {
     fn from(pixel: Color) -> Pixel {
         Pixel {
@@ -68,7 +70,7 @@ fn main() {
     const IMAGE_WIDTH: u32 = 512;
     const IMAGE_HEIGHT: u32 = (IMAGE_WIDTH as f64 / ASPECT_RATIO) as u32;
     const SAMPLES_PER_PIXEL: u64 = 100;
-    const MAX_DEPTH: u64 = 5;
+    const MAX_DEPTH: u64 = 10;
 
     // Multithreading
     const NUM_CORES: usize = 16;
@@ -87,17 +89,21 @@ fn main() {
             let mut world = World::new();
             let mat_ground = Rc::new(Lambertian::new(Color::new(0.8, 0.8, 0.0)));
             let mat_center = Rc::new(Lambertian::new(Color::new(0.7, 0.3, 0.3)));
-            let mat_left = Rc::new(Metal::new(Color::new(0.8, 0.8, 0.8), 0.3));
+            let mat_left = Rc::new(Metal::new(Color::new(0.8, 0.8, 0.8), 0.0));
             let mat_right = Rc::new(Metal::new(Color::new(0.8, 0.6, 0.2), 1.0));
+            let mat_clear = Rc::new(Dielectric::new(1.5));
+            let mat_clear_inner = Rc::new(Dielectric::new(1.5));
 
             let sphere_ground = Sphere::new(Point3::new(0.0, -100.5, -1.0), 100.0, mat_ground);
             let sphere_center = Sphere::new(Point3::new(0.0, 0.0, -1.0), 0.5, mat_center);
-            let sphere_left = Sphere::new(Point3::new(-1.0, 0.0, -1.0), 0.5, mat_left);
+            let sphere_left = Sphere::new(Point3::new(-1.0, 0.0, -1.0), 0.5, mat_clear);
+            let sphere_left_inner = Sphere::new(Point3::new(-1.0, 0.0, -1.0), -0.4, mat_clear_inner);
             let sphere_right = Sphere::new(Point3::new(1.0, 0.0, -1.0), 0.5, mat_right);
 
             world.push(Box::new(sphere_ground));
             world.push(Box::new(sphere_center));
             world.push(Box::new(sphere_left));
+            world.push(Box::new(sphere_left_inner));
             world.push(Box::new(sphere_right));
 
             let mut rng = rand::thread_rng();
@@ -125,22 +131,6 @@ fn main() {
     for handle in handles {
         handle.join().unwrap();
     }
-
-    /*for (x, y) in img.coordinates() {
-        let mut pixel_color = Color::new(0.0, 0.0, 0.0);
-        for _ in 0..SAMPLES_PER_PIXEL {
-            let random_u: f64 = rng.gen();
-            let random_v: f64 = rng.gen();
-            let (u, v) = (
-                (x as f64 + random_u) / (IMAGE_WIDTH - 1) as f64,
-                (y as f64 + random_v) / (IMAGE_HEIGHT - 1) as f64,
-            );
-            let ray = camera.get_ray(u, 1.0 - v);
-            pixel_color += ray_color(&ray, &world, MAX_DEPTH);
-        }
-
-        img.set_pixel(x, y, Pixel::from(pixel_color / SAMPLES_PER_PIXEL as f64));
-    }*/
 
     let path = Path::new("c:\\_work\\rusttracing\\img.bmp");
     img.lock().unwrap().save(path);
